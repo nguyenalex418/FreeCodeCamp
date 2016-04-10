@@ -93,6 +93,7 @@ main = (function(main, global) {
           '<span>Free Code Camp\'s Main Chat</span>' +
         '</div>'
       );
+      return null;
     });
 
 
@@ -233,7 +234,7 @@ $(document).ready(function() {
     };
 
     $('#story-submit').unbind('click');
-    $.post('/stories/', data)
+    return $.post('/stories/', data)
       .fail(function() {
         $('#story-submit').bind('click', storySubmitButtonHandler);
       })
@@ -243,6 +244,7 @@ $(document).ready(function() {
           return null;
         }
         window.location = '/stories/' + storyLink;
+        return null;
       });
   };
 
@@ -296,12 +298,12 @@ $(document).ready(function() {
   }
 
   function expandBlock(item) {
-    $(item).addClass('in').css('height', '100%');
+    $(item).addClass('in').css('height', 'auto');
     expandCaret(item);
   }
 
   function collapseBlock(item) {
-    $(item).removeClass('in').css('height', '100%');
+    $(item).removeClass('in').css('height', 'auto');
     collapseCaret(item);
   }
 
@@ -354,7 +356,7 @@ $(document).ready(function() {
 
   function showMap() {
     if (!main.isMapAsideLoad) {
-      var mapAside = $('<iframe>');
+      var mapAside = $('<iframe id = "map-aside-frame" >');
       mapAside.attr({
         src: '/map-aside',
         frameBorder: '0'
@@ -387,7 +389,7 @@ $(document).ready(function() {
     if (!main.isWikiAsideLoad) {
       var lang = window.location.toString().match(/\/\w{2}\//);
       lang = (lang) ? lang[0] : '/en/';
-      var wikiURL = 'http://freecodecamp.github.io/wiki' + lang;
+      var wikiURL = '//freecodecamp.github.io/wiki' + lang;
       var wikiAside = $('<iframe>');
       wikiAside.attr({
         src: wikiURL,
@@ -532,4 +534,82 @@ $(document).ready(function() {
 
   // keyboard shortcuts: open map
   window.Mousetrap.bind('g m', toggleMap);
+
+  // Night Mode
+  function changeMode() {
+    var newValue = false;
+    try {
+      newValue = !JSON.parse(localStorage.getItem('nightMode'));
+    } catch (e) {
+      console.error('Error parsing value form local storage:', 'nightMode', e);
+    }
+    localStorage.setItem('nightMode', String(newValue));
+    toggleNightMode(newValue);
+  }
+
+  function toggleNightMode(nightModeEnabled) {
+    var iframe = document.getElementById('map-aside-frame');
+    if (iframe) {
+      iframe.src = iframe.src;
+    }
+    var body = $('body');
+    body.hide();
+    if (nightModeEnabled) {
+      body.addClass('night');
+    } else {
+      body.removeClass('night');
+    }
+    body.fadeIn('100');
+  }
+
+  if (typeof localStorage.getItem('nightMode') !== 'undefined') {
+    var oldVal = false;
+    try {
+      oldVal = JSON.parse(localStorage.getItem('nightMode'));
+    } catch (e) {
+      console.error('Error parsing value form local storage:', 'nightMode', e);
+    }
+    toggleNightMode(oldVal);
+    $('.nightMode-btn').on('click', function() {
+      changeMode();
+    });
+  } else {
+    localStorage.setItem('nightMode', 'false');
+    toggleNightMode('false');
+  }
+
+  // Hot Keys
+  window.Mousetrap.bind('g t n', changeMode);
+  window.Mousetrap.bind('g n n', () => {
+    // Next Challenge
+    window.location = '/challenges/next-challenge';
+  });
+  window.Mousetrap.bind('g n a', () => {
+    // Account
+    window.location = '/account';
+  });
+  window.Mousetrap.bind('g n m', () => {
+    // Map
+    window.location = '/map';
+  });
+  window.Mousetrap.bind('g n w', () => {
+    // Wiki
+    window.location = '/wiki';
+  });
+  window.Mousetrap.bind('g n a', () => {
+    // About
+    window.location = '/about';
+  });
+  window.Mousetrap.bind('g n s', () => {
+    // Shop
+    window.location = '/shop';
+  });
+  window.Mousetrap.bind('g n o', () => {
+    // Settings
+    window.location = '/settings';
+  });
+  window.Mousetrap.bind('g n r', () => {
+    // Repo
+    window.location = 'https://github.com/freecodecamp/freecodecamp/';
+  });
 });

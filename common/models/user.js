@@ -7,7 +7,7 @@ import debugFactory from 'debug';
 import { saveUser, observeMethod } from '../../server/utils/rx';
 import { blacklistedUsernames } from '../../server/utils/constants';
 
-const debug = debugFactory('freecc:user:remote');
+const debug = debugFactory('fcc:user:remote');
 const BROWNIEPOINTS_TIMEOUT = [1, 'hour'];
 
 function getAboutProfile({
@@ -271,7 +271,7 @@ module.exports = function(User) {
         ));
       });
     }
-    User.findOne({ where: { username } }, (err, user) => {
+    return User.findOne({ where: { username } }, (err, user) => {
       if (err) {
         return cb(err);
       }
@@ -327,7 +327,7 @@ module.exports = function(User) {
         .valueOf();
       const user$ = findUser({ where: { username: receiver }});
 
-      user$
+      return user$
         .tapOnNext((user) => {
           if (!user) {
             throw new Error(`could not find receiver for ${ receiver }`);
@@ -440,5 +440,29 @@ module.exports = function(User) {
       ));
     }
     return this.constructor.update$({ id }, updateData, updateOptions);
+  };
+  User.prototype.getPoints$ = function getPoints$() {
+    const id = this.getId();
+    const filter = {
+      where: { id },
+      fields: { progressTimestamps: true }
+    };
+    return this.constructor.findOne$(filter)
+      .map(user => {
+        this.progressTimestamps = user.progressTimestamps;
+        return user.progressTimestamps;
+      });
+  };
+  User.prototype.getChallengeMap$ = function getChallengeMap$() {
+    const id = this.getId();
+    const filter = {
+      where: { id },
+      fields: { challengeMap: true }
+    };
+    return this.constructor.findOne$(filter)
+      .map(user => {
+        this.challengeMap = user.challengeMap;
+        return user.challengeMap;
+      });
   };
 };

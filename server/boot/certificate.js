@@ -22,7 +22,7 @@ import {
 
 import certTypes from '../utils/certTypes.json';
 
-const log = debug('freecc:certification');
+const log = debug('fcc:certification');
 const sendMessageToNonUser = ifNoUserSend(
   'must be logged in to complete.'
 );
@@ -84,7 +84,8 @@ export default function certificate(app) {
 
   function verifyCert(certType, req, res, next) {
     const { user } = req;
-    return certTypeIds[certType]
+    return user.getChallengeMap$()
+      .flatMap(() => certTypeIds[certType])
       .flatMap(challenge => {
         const {
           id,

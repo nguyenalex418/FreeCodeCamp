@@ -1,24 +1,15 @@
-var Rx = require('rx'),
-    async = require('async'),
-    moment = require('moment'),
-    request = require('request'),
-    debug = require('debug')('freecc:cntr:resources'),
-    constantStrings = require('../utils/constantStrings.json'),
-    labs = require('../resources/labs.json'),
-    testimonials = require('../resources/testimonials.json'),
-    secrets = require('../../config/secrets');
+import request from 'request';
+import constantStrings from '../utils/constantStrings.json';
+import labs from '../resources/labs.json';
+import testimonials from '../resources/testimonials.json';
+import secrets from '../../config/secrets';
 
 module.exports = function(app) {
-  var router = app.loopback.Router();
-  var User = app.models.User;
-  var Challenge = app.models.Challenge;
-  var Story = app.models.Story;
-  var Nonprofit = app.models.Nonprofit;
-
+  const router = app.loopback.Router();
+  const User = app.models.User;
   router.get('/api/github', githubCalls);
   router.get('/api/blogger', bloggerCalls);
   router.get('/api/trello', trelloCalls);
-  router.get('/sitemap.xml', sitemap);
   router.get('/chat', chat);
   router.get('/coding-bootcamp-cost-calculator', bootcampCalculator);
   router.get('/twitch', twitch);
@@ -26,7 +17,9 @@ module.exports = function(app) {
   router.get('/pmi-acp-agile-project-managers-form', agileProjectManagersForm);
   router.get('/nonprofits', nonprofits);
   router.get('/nonprofits-form', nonprofitsForm);
-  router.get('/unsubscribe/:email', unsubscribe);
+  router.get('/unsubscribe/:email', unsubscribeMonthly);
+  router.get('/unsubscribe-notifications/:email', unsubscribeNotifications);
+  router.get('/unsubscribe-quincy/:email', unsubscribeQuincy);
   router.get('/unsubscribed', unsubscribed);
   router.get('/get-started', getStarted);
   router.get('/submit-cat-photo', submitCatPhoto);
@@ -38,127 +31,15 @@ module.exports = function(app) {
   router.get('/all-stories', showAllTestimonials);
   router.get('/terms', terms);
   router.get('/privacy', privacy);
+  router.get('/how-nonprofit-projects-work', howNonprofitProjectsWork);
   router.get('/code-of-conduct', codeOfConduct);
   router.get('/academic-honesty', academicHonesty);
-
   router.get(
     '/the-fastest-web-page-on-the-internet',
     theFastestWebPageOnTheInternet
   );
 
   app.use(router);
-
-  function sitemap(req, res, next) {
-    var appUrl = 'http://www.freecodecamp.com';
-    var now = moment(new Date()).format('YYYY-MM-DD');
-
-    // TODO(berks): refactor async to rx
-    async.parallel({
-        users: function(callback) {
-          User.find(
-            {
-              where: { username: { nlike: '' } },
-              fields: { username: true }
-            },
-            function(err, users) {
-              if (err) {
-                debug('User err: ', err);
-                callback(err);
-              } else {
-                Rx.Observable.from(users, null, null, Rx.Scheduler.default)
-                  .map(function(user) {
-                    return user.username;
-                  })
-                  .toArray()
-                  .subscribe(
-                    function(usernames) {
-                      callback(null, usernames);
-                    },
-                    callback
-                  );
-              }
-            });
-        },
-
-        challenges: function(callback) {
-          Challenge.find(
-            { fields: { name: true } },
-            function(err, challenges) {
-              if (err) {
-                debug('Challenge err: ', err);
-                callback(err);
-              } else {
-                Rx.Observable.from(challenges, null, null, Rx.Scheduler.default)
-                  .map(function(challenge) {
-                    return challenge.name;
-                  })
-                  .toArray()
-                  .subscribe(
-                    callback.bind(callback, null),
-                    callback
-                  );
-              }
-            });
-        },
-        stories: function(callback) {
-          Story.find(
-            { field: { link: true } },
-            function(err, stories) {
-              if (err) {
-                debug('Story err: ', err);
-                callback(err);
-              } else {
-                Rx.Observable.from(stories, null, null, Rx.Scheduler.default)
-                  .map(function(story) {
-                    return story.link;
-                  })
-                  .toArray()
-                  .subscribe(
-                    callback.bind(callback, null),
-                    callback
-                  );
-              }
-            }
-          );
-        },
-        nonprofits: function(callback) {
-          Nonprofit.find(
-            { field: { name: true } },
-            function(err, nonprofits) {
-              if (err) {
-                debug('User err: ', err);
-                callback(err);
-              } else {
-                Rx.Observable.from(nonprofits, null, null, Rx.Scheduler.default)
-                  .map(function(nonprofit) {
-                    return nonprofit.name;
-                  })
-                  .toArray()
-                  .subscribe(
-                    callback.bind(callback, null),
-                    callback
-                  );
-              }
-            });
-        }
-      }, function(err, results) {
-        if (err) {
-          return next(err);
-        }
-        process.nextTick(function() {
-          res.header('Content-Type', 'application/xml');
-          res.render('resources/sitemap', {
-            appUrl: appUrl,
-            now: now,
-            users: results.users,
-            challenges: results.challenges,
-            stories: results.stories,
-            nonprofits: results.nonprofits
-          });
-        });
-      }
-    );
-  }
 
   function chat(req, res) {
     res.redirect('https://gitter.im/FreeCodeCamp/FreeCodeCamp');
@@ -180,6 +61,12 @@ module.exports = function(app) {
   function privacy(req, res) {
       res.render('resources/privacy', {
           title: 'Privacy policy'
+      });
+  }
+
+  function howNonprofitProjectsWork(req, res) {
+      res.render('resources/how-nonprofit-projects-work', {
+          title: 'How our nonprofit projects work'
       });
   }
 
@@ -227,14 +114,18 @@ module.exports = function(app) {
   }
 
   function confirmStickers(req, res) {
-      req.flash('success', { msg: 'Thank you for supporting our community! You should receive your stickers in the ' +
-        'mail soon!'});
-      res.redirect('/shop');
+    req.flash('success', {
+      msg: 'Thank you for supporting our community! You should receive ' +
+        'your stickers in the mail soon!'
+    });
+    res.redirect('/shop');
   }
 
   function cancelStickers(req, res) {
-      req.flash('info', { msg: 'You\'ve cancelled your purchase of our stickers. You can '
-        + 'support our community any time by buying some.'});
+      req.flash('info', {
+        msg: 'You\'ve cancelled your purchase of our stickers. You can ' +
+          'support our community any time by buying some.'
+      });
       res.redirect('/shop');
   }
   function submitCatPhoto(req, res) {
@@ -272,27 +163,69 @@ module.exports = function(app) {
   }
 
   function twitch(req, res) {
-    res.render('resources/twitch', {
-      title: 'Watch us code on Twitch.tv and LiveCoding.tv'
+    res.redirect('https://twitch.tv/freecodecamp');
+  }
+
+  function unsubscribeMonthly(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      if (!user) {
+        req.flash('info', {
+          msg: 'Email address not found. ' +
+          'Please update your Email preferences from your profile.'
+        });
+        return res.redirect('/map');
+      }
+      return user.updateAttribute('sendMonthlyEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
+        });
+        return res.redirect('/unsubscribed');
+      });
     });
   }
 
-  function unsubscribe(req, res, next) {
-    User.findOne({ where: { email: req.params.email } }, function(err, user) {
-      if (user) {
-        if (err) {
-          return next(err);
-        }
-        user.sendMonthlyEmail = false;
-        user.save(function() {
-          if (err) {
-            return next(err);
-          }
-          res.redirect('/unsubscribed');
+  function unsubscribeNotifications(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      if (!user) {
+        req.flash('info', {
+          msg: 'Email address not found. ' +
+          'Please update your Email preferences from your profile.'
         });
-      } else {
-        res.redirect('/unsubscribed');
+        return res.redirect('/map');
       }
+      return user.updateAttribute('sendNotificationEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
+        });
+        return res.redirect('/unsubscribed');
+      });
+    });
+  }
+
+  function unsubscribeQuincy(req, res, next) {
+    req.checkParams('email', 'Must send a valid email').isEmail();
+    return User.findOne({ where: { email: req.params.email } }, (err, user) => {
+      if (err) { return next(err); }
+      if (!user) {
+        req.flash('info', {
+          msg: 'Email address not found. ' +
+          'Please update your Email preferences from your profile.'
+        });
+        return res.redirect('/map');
+      }
+      return user.updateAttribute('sendQuincyEmail', false, (err) => {
+        if (err) { return next(err); }
+        req.flash('info', {
+          msg: 'We\'ve successfully updated your Email preferences.'
+        });
+        return res.redirect('/unsubscribed');
+      });
     });
   }
 
@@ -330,7 +263,7 @@ module.exports = function(app) {
           Object.keys(JSON.parse(pulls)).length :
           'Can\'t connect to github';
 
-        request(
+        return request(
           [
             'https://api.github.com/repos/freecodecamp/',
             'freecodecamp/issues?client_id=',
@@ -344,7 +277,7 @@ module.exports = function(app) {
             issues = ((pulls === parseInt(pulls, 10)) && issues) ?
             Object.keys(JSON.parse(issues)).length - pulls :
               "Can't connect to GitHub";
-            res.send({
+            return res.send({
               issues: issues,
               pulls: pulls
             });
@@ -364,7 +297,7 @@ module.exports = function(app) {
           (JSON.parse(trello)) :
           'Can\'t connect to to Trello';
 
-        res.end(JSON.stringify(trello));
+        return res.end(JSON.stringify(trello));
       });
   }
 
@@ -379,7 +312,7 @@ module.exports = function(app) {
         blog = (status && status.statusCode === 200) ?
           JSON.parse(blog) :
           'Can\'t connect to Blogger';
-        res.end(JSON.stringify(blog));
+        return res.end(JSON.stringify(blog));
       }
     );
   }
